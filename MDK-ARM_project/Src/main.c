@@ -174,6 +174,15 @@ ARM_AHEAD_1();
 						 if(last_mode != 0xff && last_mode != mode)	//switch to car
 						 {
 							TO_CAR();
+							 
+							//hand
+							//RESET: back
+							//SET: forward
+							HAL_GPIO_WritePin(GPIOF ,GPIO_PIN_13,GPIO_PIN_RESET );
+							HAL_TIM_PWM_Start(&htim8,TIM_CHANNEL_2);
+							HAL_Delay (1000);
+							HAL_TIM_PWM_Stop(&htim8,TIM_CHANNEL_2);
+							 
 						 }
 						 switch(move_dir)      //motion switch
 						 {
@@ -191,6 +200,15 @@ ARM_AHEAD_1();
 							if(last_mode != 0xff && last_mode != mode && last_mode !=0x02 )	//switch to foot
 						 {
 							TO_FOOT();
+								
+							//hand
+							//RESET: back
+							//SET: forward
+							HAL_GPIO_WritePin(GPIOF ,GPIO_PIN_13,GPIO_PIN_SET );
+							HAL_TIM_PWM_Start(&htim8,TIM_CHANNEL_2);
+							HAL_Delay (1000);
+							HAL_TIM_PWM_Stop(&htim8,TIM_CHANNEL_2);
+								
 						 }
 						 switch(move_dir)      //motion switch
 						 {
@@ -219,6 +237,15 @@ ARM_AHEAD_1();
 							if(last_mode != 0xff && last_mode != mode && last_mode !=0x01 )	//switch to foot
 						 {
 							TO_FOOT();
+								
+							//hand
+							//RESET: back
+							//SET: forward
+							HAL_GPIO_WritePin(GPIOF ,GPIO_PIN_13,GPIO_PIN_SET );
+							HAL_TIM_PWM_Start(&htim8,TIM_CHANNEL_2);
+							HAL_Delay (1000);
+							HAL_TIM_PWM_Stop(&htim8,TIM_CHANNEL_2);
+								
 						 }
 							switch(move_dir)      //motion switch
 							{
@@ -242,6 +269,20 @@ ARM_AHEAD_1();
 							if(last_mode != 0xff && last_mode != mode)	//switch to box
 						 {
 							TO_BOX();
+							if(last_mode == 0x00)
+							 {
+								 
+							 }
+							 else if(last_mode == 0x01 || last_mode == 0x02)
+							 {
+								//hand
+								//RESET: back
+								//SET: forward
+								HAL_GPIO_WritePin(GPIOF ,GPIO_PIN_13,GPIO_PIN_RESET );
+								HAL_TIM_PWM_Start(&htim8,TIM_CHANNEL_2);
+								HAL_Delay (1000);
+								HAL_TIM_PWM_Stop(&htim8,TIM_CHANNEL_2);
+							 }	
 						 }
 							
 						}
