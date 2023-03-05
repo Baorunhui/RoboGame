@@ -63,7 +63,9 @@ if(&0x8000)
 {
     	 if((USART2_RX_STA&0x7FFF) ==10 	               
     			&& USART2_RX_BUF[0]==0xA5 	
-    			&& USART2_RX_BUF[9]==(USART2_RX_BUF[1] + USART2_RX_BUF[2] + USART2_RX_BUF[3] + USART2_RX_BUF[4] + USART2_RX_BUF[5] + USART2_RX_BUF[6] + USART2_RX_BUF[7] + USART2_RX_BUF[8])%0x100)	
+    			&& USART2_RX_BUF[9]==(USART2_RX_BUF[1] + USART2_RX_BUF[2] + USART2_RX_BUF[3] + 
+			USART2_RX_BUF[4] + USART2_RX_BUF[5] + USART2_RX_BUF[6] + 
+			USART2_RX_BUF[7] + USART2_RX_BUF[8])%0x100)	
     	{
           ......
 ```
@@ -85,14 +87,15 @@ uint8_t save = USART2_RX_BUF[8];
 
 ```c
 switch(left_speed)      //left speed switch
-    		 {   
-    		 case(0x00):__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1,0);break;    //0%
-				 case(0x14):__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1,4000) ;break;//20%
-				 case(0x28):__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1,8000) ;break;//40%
-				 case(0x3C):__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1,12000);break;//60%
-				 case(0x50):__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1,16000);break;//80%
-				 case(0x64):__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1,20000);break;//100%
-				 default:break;
+{   
+case(0x00):__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1,0);break;    //0%
+	 case(0x14):__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1,4000) ;break;//20%
+	 case(0x28):__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1,8000) ;break;//40%
+	 case(0x3C):__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1,12000);break;//60%
+	 case(0x50):__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1,16000);break;//80%
+	 case(0x64):__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1,20000);break;//100%
+	 default:break;
+}
 ```
 根据```left_speed```字段调整```htim2```的PWM波，它是发送给电机驱动模块的PWM波，以此调整车速。```right_speed```字段同理
 这里将左侧两轮和右侧两轮的速度分别设置，通过改变两轮差速以实现车形态下的左转右转
@@ -104,14 +107,16 @@ switch(mode)
     case(0x01):   //foot mode (tri)
     case(0x02):   //foot mode (wave)
     case(0x03):   //box mode
+    default:break;
+}
 ```
 根据```mode```字段判断当前机器人形态，并在每个形态下分别实现对应操作
 下面以车形态为例：
 ```c
 if(last_mode != 0xff && last_mode != mode)	//switch to car
-						 {
-							TO_CAR();
-						 }
+{
+TO_CAR();
+}
 ```
 如果```last_mode```标记的上一个形态和当前形态不同，则切换为车形态
 
@@ -171,14 +176,140 @@ USART2_RX_STA=0;
 ### 蓝牙接收模块
 代码见[usart.c](./MDK-ARM_project/Src/usart.c)和[usart.h](./MDK-ARM_project/Src/usart.h)
 
+
+```c
+extern uint8_t  USART2_RX_BUF[USART2_REC_LEN];//usart receive buffer
+extern uint16_t USART2_RX_STA; //receive state 
+extern uint8_t USART2_NewData;// 1 byte 
+```
+在```usart.h```中定义了几个全局变量，以便它们在```main.c```被调用
+
+```c
+void  HAL_UART_RxCpltCallback(UART_HandleTypeDef  *huart)
+{
+	if(huart ==&huart2)
+    {
+        if((USART2_RX_STA&0x8000)==0)
+        {
+            if(USART2_NewData==0x5A)
+            {
+                 USART2_RX_STA|=0x8000; 
+            }
+            else
+            {
+                   USART2_RX_BUF[USART2_RX_STA&0X7FFF]=USART2_NewData; 
+                   USART2_RX_STA++;  
+                   if(USART2_RX_STA>(USART2_REC_LEN-1))
+			USART2_RX_STA=0;
+            }
+        }
+        HAL_UART_Receive_IT(&huart2,(uint8_t *)&USART2_NewData,1); 
+    }
+}
+```
+在```usart.c```中定义了```HAL_UART_RxCpltCallback```函数，它定义了收到蓝牙信号，引发串口中断后的行为：
+检验并设置```USART2_RX_STA```，用```USART2_NewData```装填```USART2_RX_BUF```
+
+值得注意的是，在每次串口处理的最后，都要调用
+```c
+HAL_UART_Receive_IT(&huart2,(uint8_t *)&USART2_NewData,1); 
+```
+重新打开串口
+
 ### 腿部控制模块
 代码见[foot](./MDK-ARM_project/Src/foot)
+```c
+void FOOT_INIT(); 
+void TO_CAR();
+void TO_FOOT();
+void TO_BOX();
+
+void TRIWALK_AHEAD();
+void TRIWALK_BACK();
+void TRIWALK_LEFT();
+void TRIWALK_RIGHT();
+
+void WAVEWALK_AHEAD();
+void WAVEWALK_BACK();
+void WAVEWALK_LEFT();
+void WAVEWALK_RIGHT();
+
+void DANCE_UP_DOWN();
+void DANCE_WAVE();
+```
+本部分设计了控制腿部行动的几种函数（变形、三组行走、波浪行走、舞蹈动作）
+它们的实现都很类似，下面以初始化```FOOT_INIT()```为例
+
+```c
+void FOOT_INIT()
+{
+	uint8_t buf[USART3_LEN] = {0xff, 0x09, 0x00, 0x00, 0x00};
+	for(int i=0; i< USART3_LEN; i++)
+		USART3_TX_BUF[i] = buf[i];
+	HAL_UART_Transmit(&huart3, USART3_TX_BUF, USART3_LEN, HAL_MAX_DELAY);
+}
+```
+函数将```{0xff, 0x09, 0x00, 0x00, 0x00}```发送给串口```huart3```，这个数据将被串口连接的16路舵机驱动板接受，舵机驱动板将选择对应的动作组，将控制信号发送给腿部舵机
 
 ### 机械臂控制模块
 代码见[arm](./MDK-ARM_project/Src/arm)
+```c
+void ARM_GRASP();
+void ARM_RELEASE();
+
+void ARM_BACK_1(); 
+void ARM_BACK_2();
+void ARM_MID();
+void ARM_AHEAD_1();
+void ARM_AHEAD_2();
+```
+本部分设计了控制机械臂行动的几种函数（抓取、释放、机械臂位置）
+它们的实现和腿部类似，不再赘述
 
 ### 电机控制模块
 代码见[motor](./MDK-ARM_project/Src/motor)
+
+本部分分为两个层次
+```c
+void L_MOTOR_GO();
+void R_MOTOR_GO();
+void L_MOTOR_BACK();
+void R_MOTOR_BACK();
+void L_MOTOR_STOP();
+void R_MOTOR_STOP();
+```
+```motor.h```和```motor.c```和实现了左右侧轮子的前进、后退、停止
+```c
+void CAR_GO();                 
+void CAR_BACK();               
+void CAR_LGO();                
+void CAR_RGO();                
+void CAR_STOP();  
+```
+```motor_control.h```和```motor_control.c```则组合上面的函数，实现车形态的前进、后退、左右转
+
+```c
+void L_MOTOR_GO()
+{
+	HAL_GPIO_WritePin(GPIOA, IN1_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(GPIOA, IN2_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOA, IN11_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(GPIOA, IN22_Pin, GPIO_PIN_RESET);
+
+}
+```
+以```L_MOTOR_GO()```为例，它通过设置单片机端口的电平，向电机驱动板发送信号以设置轮子转向
+而轮子转速则在```main.c```中通过调整PWM波以设置
+
+```c
+d CAR_GO()
+{	
+	L_MOTOR_GO();
+	R_MOTOR_GO();
+}
+```
+以```CAR_GO()```为例，它通过左侧两轮正转和右侧两轮正转来实现前行
+
 
 ### 音响控制模块
 代码见[music](./MDK-ARM_project/Src/music)
